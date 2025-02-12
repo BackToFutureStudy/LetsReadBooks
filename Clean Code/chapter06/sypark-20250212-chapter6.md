@@ -65,6 +65,92 @@ final String outputDir = ctxt.getOptions().getScratchDir().getAbsolutePath();
 BufferedOutputStream bos = ctxt.createScratchFileStream(classFileName);
 ```
 
+
+
+++ 디미터 법칙 관련 예제 추가
+
+참고문헌
+[OOP] 디미터의 법칙(Law of Demeter) ([링크](https://mangkyu.tistory.com/147))
+
+
+- 디미터 법칙 위반 코드
+```java
+@Getter
+public class User {
+
+    private String email;
+    private String name;
+    private Address address;
+
+}
+
+@Getter
+public class Address {
+
+    private String region;
+    private String details;
+
+}
+
+public class NotificationService {
+
+    public void sendMessageForSeoulUser(final User user) {
+        if("서울".equals(user.getAddress().getRegion())) {
+            sendNotification(user);
+        }
+    }
+}
+```
+객체에게 메세지를 보내는 것이 아니라 객체가 가지는 자료를 확인하고 있으며,
+다른 객체가 어떠한 자료를 갖고 있는지 지나치게 잘 알게 되는 코드이다. 
+Getter 메소드를 통해 user객체가 email, name, address를 가지고 있음을 파악해버릴 수 있다.
+
+
+- 디미터의 법칙을 준수하는 코드
+객체의 데이터를 통해 사용자의 지역을 파악하는 것이 아니라, 
+객체한테 메세지를 보내서 해당 지역에 사는지 파악하도록 구현해야 한다.
+```java
+public class Address {
+
+    private String region;
+    private String details;
+
+    public boolean isSeoulRegion() {
+        return "서울".equals(region);
+    }
+}
+
+public class User {
+
+    private String email;
+    private String name;
+    private Address address;
+
+    public boolean isSeoulUser() {
+        return address.isSeoulRegion();
+    }
+}
+
+public class NotificationService {
+
+    public void sendMessageForSeoulUser(final User user) {
+        if(user.isSeoulUser()) {
+            sendNotification(user);
+        }
+    }
+}
+```
+
+이렇게 "디미터의 법칙"은 "결합도와 관련된 것"이며, 
+"객체의 내부 구조가 외부로 노출되는지"에 대한 것이다. 
+"객체에게 자료를 숨기는 대신 함수를 공개"하도록해서, 
+디미터의 법칙을 준수함으로써 캡슐화를 높혀 객체의 자율성과 응집도를 높일 수 있다.
+
+DTO나 컬렉션 객체와 같은 자료 구조의 경우에는 물을 수 밖에 없다. 
+만약 묻는 대상이 "객체"가 아닌 "자료구조"라면 당연히 "내부를 노출"해야 하므로 
+디미터의 법칙을 적용할 필요가 없다.
+
+
 ## 자료 전달 객체(DTO)
 - 자료 구조체의 전형적인 형태는 공개 변수만 있고 함수가 없는 클래스로, 자료 전달 객체 Data Transfer Object, DTO라 한다. 
 
