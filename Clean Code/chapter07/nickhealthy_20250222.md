@@ -232,3 +232,181 @@ public class LocalPort {
 
 ## 정상 흐름을 정의하라
 
+**특수 상황을 처리하는 예외 때문에 코드가 복잡하고 어려워질 때가 있다.**
+이런 경우 특수 사례 패턴(Special Case Pattern)을 통해 처리하면 좋다.
+**이 패턴의 주로 사용되는 상황은 특정 조건에서 다른 흐름을 유지해야 할 때이다.** 예를 들어, 함수나 메서드가 특정 입력에 대해 '정상적인' 동작을 하지 않고, 대신 다른 행동을 취해야 할 경우가 있다. 이런 특수한 조건을 일반적인 로직에서 분리하여 명확하게 처리하는 것이 중요하다.
+
+
+
+✅ **값이 없을 때 처리)**
+
+예를 들어, 함수가 리스트나 배열을 처리하는데, 리스트가 비어있는 경우를 다뤄야 한다면, 이를 "특수 사례"로 보고 별도의 코드로 처리할 수 있다.
+
+```java
+import java.util.List;
+
+public class ItemFinder {
+
+    // 리스트가 비어있는지 확인하는 메서드
+    public static boolean isEmpty(List<?> items) {
+        return items == null || items.isEmpty();
+    }
+
+    public static String findItem(List<String> items, String target) {
+        if (isEmpty(items)) {  // 리스트가 비어있는지 확인
+            return null;
+        }
+        for (String item : items) {
+            if (item.equals(target)) {
+                return item;
+            }
+        }
+        return null;
+    }
+
+    public static void main(String[] args) {
+        List<String> items = List.of("apple", "banana", "cherry");
+        String target = "banana";
+        
+        String result = findItem(items, target);
+        System.out.println(result);  // 출력: banana
+    }
+}
+
+```
+
+
+
+✅ **파일이 없는 경우를 처리하는 함수 분리)**
+
+```java
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.util.Scanner;
+
+public class FileReader {
+
+    // 파일이 없을 때 처리하는 메서드
+    public static void handleFileNotFound(String fileName) {
+        System.out.println("파일 " + fileName + "을 찾을 수 없습니다.");
+    }
+
+    public static String readFile(String fileName) {
+        try {
+            Scanner scanner = new Scanner(new File(fileName));
+            StringBuilder content = new StringBuilder();
+            while (scanner.hasNextLine()) {
+                content.append(scanner.nextLine()).append("\n");
+            }
+            scanner.close();
+            return content.toString();
+        } catch (FileNotFoundException e) { // 파일이 없는 경우
+            handleFileNotFound(fileName);
+            return null;
+        }
+    }
+
+    public static void main(String[] args) {
+        String fileName = "nonexistent_file.txt";
+        
+        String fileContent = readFile(fileName);
+        if (fileContent != null) {
+            System.out.println(fileContent);
+        }
+    }
+}
+
+```
+
+
+
+✅ **예외적인 조건을 처리하는 경우**
+
+```java
+// 원본 코드
+try {
+	MealExpenses expenses = expenseReportDAO.getMeals(employee.getID());
+	m_total += expenses.getTotal();
+} catch(MealExpensesNotFound e) {
+	m_total += getMealPerDiem();
+}
+
+// 특수 사례 패턴을 적용한 코드
+MealExpenses expenses = expenseReportDAO.getMeals(employee.getID());
+m_total += expenses.getTotal();
+
+// 특수 사례 패턴
+public class PerDiemMealExpenses implements MealExpenses {
+	public int getTotal() {
+		// 기본값으로 일일 기본 식비를 반환한다.
+	}
+}
+```
+
+
+
+이러한 처리를 통해 **코드의 가독성을 높이고, 예외적인 상황에서의 로직을 분리하여 다른 코드 흐름이 깨지지 않도록 하기 위함**이다. 
+
+
+
+## null을 반환하지 마라
+
+`null`을 반환하고 이를 `if(object != null)`으로 확인하는 방식은 **나쁘다**.
+
+* 메서드에서 `null`을 반환하고 싶은 유혹이 든다면 그 <u>대신 예외를 던지거나 특수 사례 객체(ex. `Collections.emptyList()`)를 반환</u>한다.
+* 사용하려는 외부 API가 null을 반환한다면 **Wrapper를 구현해 예외를 던지거나 특수 사례 객체를 반환하는 방식을 고려**한다.
+
+> 많은 경우 특수 사례 객체가 손쉬운 해결책이다.
+
+
+
+❌ **잘못된 방법)** - null을 반환하는 메서드
+
+```java
+List<Employee> employees = getEmployees();
+if (employees != null) {
+	for(Employee e : employees) {
+		totalPay += e.getPay();
+	}
+}
+```
+
+
+
+✅ **옳은 방법)** - 특수 사례 객체를 반환
+
+```java
+List<Employee> employees = getEmployees();
+for(Employee e : employees) {
+	totalPay += e.getPay();
+}
+
+public List<Employee> getEmployees() {
+	if ( ...직원이 없다면... ) {
+		return Collections.emptyList();
+	}
+}
+```
+
+
+
+코드도 깔끔해지며 NPE이 발생할 가능성도 줄어든다.
+
+
+
+## null을 전달하지 마라
+
+**null을 반환하는 방식보다 메서드로 null을 전달하는 방식은 더 나쁘다.** 
+정상적인 인수로 null을 기대하는 API가 아니람녀 메서드로 null을 전달하는 코드는 최대한 피한다.
+
+* 예외를 던지거나 `assert` 문을 사용할 수는 있지만 완벽한 해결책은 아니다.
+* 애초에 `null`을 전달하는 경우는 금지하는 것이 바람직하다.
+
+
+
+## 결론
+
+깨끗한 코드는 읽기도 좋아야 하지만 **안전성도 높아야 한다.** 이 둘은 상충하는 목표가 아니다.
+
+* **오류 처리를 프로그램 논리와 분리**해야 튼튼하고 깨끗한 코드를 작성할 수 있다.
+* 오류 처리를 프로그램 논리와 분리하면 독립적인 추론이 가능해지며 코드 유지보수성도 크게 높아진다.
